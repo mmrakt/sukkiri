@@ -1,0 +1,35 @@
+{
+	"permissions": {
+		"allow": [
+			"Bash(cargo:*)",
+			"Bash(find:*)",
+			"Bash(mkdir:*)",
+			"Bash(git remote get-url:*)",
+			"mcp__github__create_issue",
+			"Bash(gh issue create:*)",
+			"Bash(grep:*)",
+			"Bash(rg:*)",
+			"mcp__ide__getDiagnostics",
+			"Bash(ls:*)",
+			"Bash(afplay:*)",
+			"Bash(git add:*)",
+			"Bash(git commit:*)",
+			"Bash(git push:*)",
+			"Bash(mv:*)",
+			"Bash(chmod:*)"
+		],
+		"deny": []
+	},
+	"hooks": {
+		"Notification": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "echo \"Claude Code: $(jq -r '.message')\" | terminal-notifier -title 'Claude Code'"
+					}
+				]
+			}
+		]
+	}
+}
