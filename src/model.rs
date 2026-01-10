@@ -3,20 +3,34 @@ use std::time::SystemTime;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CategoryType {
+    XcodeJunk,
+    SystemLogs,
     SystemCache,
     UserLogs,
-    XcodeDerivedData,
-    NodeModules, // Placeholder
+    UserCache,
+    BrowserCache,
+    Downloads,
+    Trash,
+    DeveloperCaches,
+    ScreenCapture,
+    NodeModules,
     #[allow(dead_code)]
-    DockerImages, // Placeholder
+    DockerImages,
 }
 
 impl CategoryType {
     pub fn name(&self) -> &str {
         match self {
-            Self::SystemCache => "System Caches",
-            Self::UserLogs => "User Logs",
-            Self::XcodeDerivedData => "Xcode Junk",
+            Self::XcodeJunk => "Xcode Junk",
+            Self::SystemLogs => "System Log Files",
+            Self::SystemCache => "System Cache Files",
+            Self::UserLogs => "User Log Files",
+            Self::UserCache => "User Cache Files",
+            Self::BrowserCache => "Browser Cache",
+            Self::Downloads => "Downloads",
+            Self::Trash => "Trash",
+            Self::DeveloperCaches => "Developer Caches",
+            Self::ScreenCapture => "Screen Capture Files",
             Self::NodeModules => "Node Modules",
             Self::DockerImages => "Docker Images",
         }

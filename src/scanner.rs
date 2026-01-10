@@ -1,6 +1,5 @@
 use crate::allowlist::Allowlist; // Added
 use crate::model::{CategoryType, ScanResult, ScannedItem};
-use anyhow::Result;
 use jwalk::WalkDir;
 use rayon::prelude::*;
 use std::fs;
@@ -11,28 +10,77 @@ pub fn scan_category(
     category: CategoryType,
     progress_cb: Option<&(dyn Fn() + Sync)>,
     allowlist: &Allowlist, // Added
-) -> Result<ScanResult> {
-    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Home directory not found"))?;
+) -> ScanResult {
+    let home = if let Ok(sudo_user) = std::env::var("SUDO_USER") {
+        PathBuf::from("/Users").join(sudo_user)
+    } else {
+        dirs::home_dir().expect("Home directory not found")
+    };
 
     let (items, description, root_path) = match category {
-        CategoryType::SystemCache => {
-            let path = home.join("Library/Caches");
-            let (_, items) = scan_path(&path, progress_cb, allowlist);
+        CategoryType::XcodeJunk => scan_xcode_junk(&home, progress_cb, allowlist),
+        CategoryType::SystemLogs => {
+            let mut items = Vec::new();
+            let mut paths = Vec::new();
+
+            let path = PathBuf::from("/Library/Logs");
+            if path.exists() {
+                let (_, mut log_items) = scan_path(&path, progress_cb, allowlist);
+                items.append(&mut log_items);
+                paths.push(path);
+            }
+
+            // Expanded: /private/var/log
+            let var_log = PathBuf::from("/private/var/log");
+            if var_log.exists() {
+                let (_, mut var_items) = scan_path(&var_log, progress_cb, allowlist);
+                items.append(&mut var_items);
+                paths.push(var_log);
+            }
+
+            let root = if paths.is_empty() {
+                PathBuf::from("/Library/Logs")
+            } else {
+                paths[0].clone()
+            };
+
             (
                 items,
-                "System cache files. Safe to delete. Rebuilds on launch.",
-                path,
+                "System log files (/Library/Logs, /private/var/log).",
+                root,
             )
+        }
+        CategoryType::SystemCache => {
+            let path = PathBuf::from("/Library/Caches");
+            let (_, items) = scan_path(&path, progress_cb, allowlist);
+            (items, "System cache files.", path)
         }
         CategoryType::UserLogs => {
             let path = home.join("Library/Logs");
             let (_, items) = scan_path(&path, progress_cb, allowlist);
-            (items, "User log files. Contains application logs.", path)
+            (items, "User log files.", path)
         }
-        CategoryType::XcodeDerivedData => {
-            let path = home.join("Library/Developer/Xcode/DerivedData");
+        CategoryType::BrowserCache => scan_browser_cache(&home, progress_cb, allowlist),
+        CategoryType::UserCache => scan_user_cache(&home, progress_cb, allowlist),
+        CategoryType::Downloads => {
+            let path = home.join("Downloads");
             let (_, items) = scan_path(&path, progress_cb, allowlist);
-            (items, "Xcode build artifacts and indexes.", path)
+            (items, "All files in Downloads folder.", path)
+        }
+        CategoryType::Trash => scan_trash(&home, progress_cb, allowlist),
+        CategoryType::DeveloperCaches => scan_developer_caches(&home, progress_cb, allowlist),
+        CategoryType::ScreenCapture => {
+            let path = home.join("Desktop");
+            let mut items = Vec::new();
+            if path.exists() {
+                let (_, dt_items) = scan_path(&path, progress_cb, allowlist);
+                // Look for "Screenshot" or "スクリーンショット" prefix
+                items.extend(dt_items.into_iter().filter(|i| {
+                    let name = i.path.file_name().unwrap_or_default().to_string_lossy();
+                    name.starts_with("Screenshot") || name.starts_with("スクリーンショット")
+                }));
+            }
+            (items, "Screenshots on Desktop.", path)
         }
         CategoryType::NodeModules => {
             let path = home.join("Projects");
@@ -65,14 +113,203 @@ pub fn scan_category(
 
     let total_size: u64 = items.iter().map(|i| i.size).sum();
 
-    Ok(ScanResult {
+    ScanResult {
         category,
         total_size,
         items,
         is_selected: false,
         description: description.to_string(),
         root_path,
-    })
+    }
+}
+
+fn scan_browser_cache(
+    home: &Path,
+    progress_cb: Option<&(dyn Fn() + Sync)>,
+    allowlist: &Allowlist,
+) -> (Vec<ScannedItem>, &'static str, PathBuf) {
+    let mut items = Vec::new();
+    let mut paths = Vec::new();
+
+    // Chrome
+    let chrome_path = home.join("Library/Caches/Google/Chrome");
+    if chrome_path.exists() {
+        let (_, mut chrome_items) = scan_path(&chrome_path, progress_cb, allowlist);
+        items.append(&mut chrome_items);
+        paths.push(chrome_path);
+    }
+
+    // Safari
+    let safari_path = home.join("Library/Caches/com.apple.Safari");
+    if safari_path.exists() {
+        let (_, mut safari_items) = scan_path(&safari_path, progress_cb, allowlist);
+        items.append(&mut safari_items);
+        paths.push(safari_path);
+    }
+
+    // Firefox
+    let firefox_path = home.join("Library/Caches/Firefox");
+    if firefox_path.exists() {
+        let (_, mut firefox_items) = scan_path(&firefox_path, progress_cb, allowlist);
+        items.append(&mut firefox_items);
+        paths.push(firefox_path);
+    }
+
+    let root = if paths.is_empty() {
+        home.join("Library/Caches")
+    } else {
+        paths[0].clone()
+    };
+
+    (items, "Web browser caches (Chrome, Safari, Firefox).", root)
+}
+
+fn scan_user_cache(
+    home: &Path,
+    progress_cb: Option<&(dyn Fn() + Sync)>,
+    allowlist: &Allowlist,
+) -> (Vec<ScannedItem>, &'static str, PathBuf) {
+    // Standard User Cache
+    let path = home.join("Library/Caches");
+    let (_, mut items) = scan_path(&path, progress_cb, allowlist);
+
+    // Filter out standard browser caches from standard user cache
+    items.retain(|item| {
+        let p = &item.path;
+        !p.to_string_lossy().contains("Google/Chrome")
+            && !p.to_string_lossy().contains("com.apple.Safari")
+            && !p.to_string_lossy().contains("Firefox")
+    });
+
+    // Scan ~/Library/Containers/*/Data/Library/Caches
+    let containers_path = home.join("Library/Containers");
+    if containers_path.exists()
+        && let Ok(entries) = fs::read_dir(&containers_path)
+    {
+        let container_caches: Vec<PathBuf> = entries
+            .filter_map(Result::ok)
+            .map(|e| e.path().join("Data/Library/Caches"))
+            .filter(|p| p.exists())
+            .collect();
+
+        // Scan each found container cache
+        // Parallelize scanning across different path roots
+        let container_items: Vec<ScannedItem> = container_caches
+            .par_iter()
+            .flat_map(|path| {
+                let (_, items) = scan_path(path, progress_cb, allowlist);
+                items
+            })
+            .collect();
+
+        items.extend(container_items);
+    }
+
+    (items, "User cache files (including sandboxed apps).", path)
+}
+
+fn scan_xcode_junk(
+    home: &Path,
+    progress_cb: Option<&(dyn Fn() + Sync)>,
+    allowlist: &Allowlist,
+) -> (Vec<ScannedItem>, &'static str, PathBuf) {
+    let mut items = Vec::new();
+    let mut paths = Vec::new();
+
+    // DerivedData
+    let derived_path = home.join("Library/Developer/Xcode/DerivedData");
+    if derived_path.exists() {
+        let (_, mut derived_items) = scan_path(&derived_path, progress_cb, allowlist);
+        items.append(&mut derived_items);
+        paths.push(derived_path);
+    }
+
+    // Archives
+    let archives_path = home.join("Library/Developer/Xcode/Archives");
+    if archives_path.exists() {
+        let (_, mut archives_items) = scan_path(&archives_path, progress_cb, allowlist);
+        items.append(&mut archives_items);
+        paths.push(archives_path);
+    }
+
+    // iOS DeviceSupport
+    let device_support_path = home.join("Library/Developer/Xcode/iOS DeviceSupport");
+    if device_support_path.exists() {
+        let (_, mut ds_items) = scan_path(&device_support_path, progress_cb, allowlist);
+        items.append(&mut ds_items);
+        paths.push(device_support_path);
+    }
+
+    // CoreSimulator (Expanded based on feedback)
+    let core_sim_path = home.join("Library/Developer/CoreSimulator");
+    if core_sim_path.exists() {
+        let (_, mut sim_items) = scan_path(&core_sim_path, progress_cb, allowlist);
+        items.append(&mut sim_items);
+        paths.push(core_sim_path);
+    }
+
+    let root = if paths.is_empty() {
+        home.join("Library/Developer/Xcode")
+    } else {
+        paths[0].clone()
+    };
+
+    (
+        items,
+        "Xcode build artifacts, archives, and device support.",
+        root,
+    )
+}
+
+fn scan_trash(
+    home: &Path,
+    progress_cb: Option<&(dyn Fn() + Sync)>,
+    allowlist: &Allowlist,
+) -> (Vec<ScannedItem>, &'static str, PathBuf) {
+    let path = home.join(".Trash");
+    let (_, items) = scan_path(&path, progress_cb, allowlist);
+    (items, "Trash folder contents.", path)
+}
+
+fn scan_developer_caches(
+    home: &Path,
+    progress_cb: Option<&(dyn Fn() + Sync)>,
+    allowlist: &Allowlist,
+) -> (Vec<ScannedItem>, &'static str, PathBuf) {
+    let mut items = Vec::new();
+    let mut paths = Vec::new();
+
+    // npm: ~/.npm
+    // bun: ~/.bun/install/cache
+    // pnpm: ~/.pnpm-store
+    // go: ~/go/pkg/mod
+    // pip: ~/Library/Caches/pip (Already covered by UserCache, but worth checking explicitly if we want to isolate)
+    // cargo: ~/.cargo/registry (Optional, risky?) -> User asked for "Developer tool related caches". Registry is cache.
+
+    let targets = vec![
+        home.join(".npm"),
+        home.join(".bun/install/cache"),
+        home.join(".pnpm-store"),
+        home.join("go/pkg/mod"),
+        home.join(".cargo/registry"),
+        home.join(".gradle/caches"),
+    ];
+
+    for path in targets {
+        if path.exists() {
+            let (_, mut sub_items) = scan_path(&path, progress_cb, allowlist);
+            items.append(&mut sub_items);
+            paths.push(path);
+        }
+    }
+
+    // Default root path logic
+    let root = home.to_path_buf(); // Fallback
+    (
+        items,
+        "Caches for npm, bun, pnpm, go, cargo, gradle, etc.",
+        root,
+    )
 }
 
 /// Helper function to scan a path and return total size and items.
@@ -257,6 +494,7 @@ fn calculate_item_stats(path: &Path) -> ScannedItem {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
     use std::fs::File;
     use std::io::Write;
     use std::thread;

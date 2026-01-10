@@ -191,9 +191,16 @@ fn main() -> Result<()> {
         .template("{spinner:.green} {msg}")?;
 
     let categories = vec![
+        CategoryType::XcodeJunk,
+        CategoryType::SystemLogs,
         CategoryType::SystemCache,
         CategoryType::UserLogs,
-        CategoryType::XcodeDerivedData,
+        CategoryType::UserCache,
+        CategoryType::BrowserCache,
+        CategoryType::Downloads,
+        CategoryType::Trash,
+        CategoryType::DeveloperCaches,
+        CategoryType::ScreenCapture,
         CategoryType::NodeModules,
         CategoryType::DockerImages,
     ];
@@ -210,18 +217,13 @@ fn main() -> Result<()> {
 
         // Spawn thread for this category
         let handle = thread::spawn(move || {
-            let result = scanner::scan_category(category, None, &allowlist_clone);
-            if let Ok(res) = result {
-                pb.finish_with_message(format!(
-                    "✔ {} found {}",
-                    res.category.name(),
-                    format_size(res.total_size, BINARY)
-                ));
-                Some(res)
-            } else {
-                pb.finish_with_message(format!("✘ Failed to scan {}", category.name()));
-                None
-            }
+            let res = scanner::scan_category(category, None, &allowlist_clone);
+            pb.finish_with_message(format!(
+                "✔ {} found {}",
+                res.category.name(),
+                format_size(res.total_size, BINARY)
+            ));
+            Some(res)
         });
 
         handles.push(handle);
@@ -407,9 +409,16 @@ fn render_usage_chart(f: &mut Frame, app: &App, area: Rect) {
         .iter()
         .map(|r| {
             let label = match r.category {
-                CategoryType::SystemCache => "Cache",
-                CategoryType::UserLogs => "Logs",
-                CategoryType::XcodeDerivedData => "Xcode",
+                CategoryType::XcodeJunk => "Xcode",
+                CategoryType::SystemLogs => "SysLog",
+                CategoryType::SystemCache => "SysCache",
+                CategoryType::UserLogs => "UsrLog",
+                CategoryType::UserCache => "UsrCache",
+                CategoryType::BrowserCache => "Browser",
+                CategoryType::Downloads => "Downlds",
+                CategoryType::Trash => "Trash",
+                CategoryType::DeveloperCaches => "DevCache",
+                CategoryType::ScreenCapture => "Screen",
                 CategoryType::NodeModules => "Node",
                 CategoryType::DockerImages => "Dockr",
             };
