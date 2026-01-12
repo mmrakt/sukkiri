@@ -1,15 +1,13 @@
-use crate::allowlist::Allowlist;
 use crate::constants::TRASH_DIR;
-use crate::model::ScannedItem;
-use crate::scanner::utils::scan_path;
-use std::path::{Path, PathBuf};
+use crate::model::CategoryType;
+use crate::scanner::PathScanner;
+use std::path::Path;
 
-pub fn scan_trash(
-    home: &Path,
-    progress_cb: Option<&(dyn Fn() + Sync)>,
-    allowlist: &Allowlist,
-) -> (Vec<ScannedItem>, &'static str, PathBuf) {
+pub fn trash_scanner(home: &Path) -> PathScanner {
     let path = home.join(TRASH_DIR);
-    let (_, items) = scan_path(&path, progress_cb, allowlist);
-    (items, "Trash folder contents.", path)
+    PathScanner {
+        category: CategoryType::Trash,
+        description: "Trash folder contents.".to_string(),
+        paths: vec![path],
+    }
 }

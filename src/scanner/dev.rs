@@ -1,19 +1,14 @@
 use crate::allowlist::Allowlist;
 use crate::constants::{
-    BUN_CACHE, CARGO_REGISTRY, GO_MOD_CACHE, GRADLE_CACHE, NPM_CACHE, PNPM_STORE,
+    BUN_CACHE, CARGO_REGISTRY, GO_MOD_CACHE, GRADLE_CACHE, NODE_MODULES, NPM_CACHE, PNPM_STORE,
+    PROJECTS_DIR,
 };
-use crate::model::ScannedItem;
-use crate::scanner::utils::scan_path;
+use crate::model::{CategoryType, ScanResult};
+use crate::scanner::utils::scan_recursive_for_target;
+use crate::scanner::{PathScanner, Scanner};
 use std::path::{Path, PathBuf};
 
-pub fn scan_developer_caches(
-    home: &Path,
-    progress_cb: Option<&(dyn Fn() + Sync)>,
-    allowlist: &Allowlist,
-) -> (Vec<ScannedItem>, &'static str, PathBuf) {
-    let mut items = Vec::new();
-    let mut paths = Vec::new();
-
+pub fn developer_caches_scanner(home: &Path) -> PathScanner {
     let targets = vec![
         home.join(NPM_CACHE),
         home.join(BUN_CACHE),
@@ -23,40 +18,48 @@ pub fn scan_developer_caches(
         home.join(GRADLE_CACHE),
     ];
 
+    let mut paths = Vec::new();
     for path in targets {
         if path.exists() {
-            let (_, mut sub_items) = scan_path(&path, progress_cb, allowlist);
-            items.append(&mut sub_items);
             paths.push(path);
         }
     }
 
-    // Default root path logic
-    let root = home.to_path_buf(); // Fallback
-    (
-        items,
-        "Caches for npm, bun, pnpm, go, cargo, gradle, etc.",
-        root,
-    )
+    PathScanner {
+        category: CategoryType::DeveloperCaches,
+        description: "Caches for npm, bun, pnpm, go, cargo, gradle, etc.".to_string(),
+        paths,
+    }
 }
 
-pub fn scan_node_modules(
-    home: &Path,
-    progress_cb: Option<&(dyn Fn() + Sync)>,
-    allowlist: &Allowlist,
-) -> (Vec<ScannedItem>, &'static str, PathBuf) {
-    use crate::constants::{NODE_MODULES, PROJECTS_DIR};
-    use crate::scanner::utils::scan_recursive_for_target;
+pub struct NodeModulesScanner {
+    pub home: PathBuf,
+}
 
-    let path = home.join(PROJECTS_DIR);
-    let items = if path.exists() {
-        scan_recursive_for_target(&path, NODE_MODULES, progress_cb, allowlist)
-    } else {
-        vec![]
-    };
-    (
-        items,
-        "Unused node_modules (Recursively found in ~/Projects)",
-        path,
-    )
+impl Scanner for NodeModulesScanner {
+    fn category(&self) -> CategoryType {
+        CategoryType::NodeModules
+    }
+
+    fn description(&self) -> String {
+        "Unused node_modules (Recursively found in ~/Projects)".to_string()
+    }
+
+    fn scan(&self, progress_cb: Option<&(dyn Fn() + Sync)>, allowlist: &Allowlist) -> ScanResult {
+        let path = self.home.join(PROJECTS_DIR);
+        let items = if path.exists() {
+            scan_recursive_for_target(&path, NODE_MODULES, progress_cb, allowlist)
+        } else {
+            vec![]
+        };
+
+        ScanResult {
+            category: self.category(),
+            total_size: items.iter().map(|i| i.size).sum(),
+            items,
+            is_selected: false,
+            description: self.description(),
+            root_path: path,
+        }
+    }
 }

@@ -185,24 +185,13 @@ impl App {
         self.scan_rx = Some(rx);
 
         let allowlist = Arc::new(Allowlist::load());
+        let scanners = scanner::get_all_scanners();
 
-        let categories = vec![
-            CategoryType::XcodeJunk,
-            CategoryType::SystemLogs,
-            CategoryType::SystemCache,
-            CategoryType::UserLogs,
-            CategoryType::UserCache,
-            CategoryType::BrowserCache,
-            CategoryType::Downloads,
-            CategoryType::Trash,
-            CategoryType::DeveloperCaches,
-            CategoryType::ScreenCapture,
-            CategoryType::NodeModules,
-            CategoryType::DockerImages,
-        ];
-        self.total_categories = categories.len();
+        self.total_categories = scanners.len();
 
-        for category in categories {
+        for scanner in scanners {
+            let category = scanner.category();
+
             // Initialize progress for this category
             self.scan_progress.insert(
                 category,
@@ -230,7 +219,7 @@ impl App {
                 };
 
                 // Perform scan
-                let res = scanner::scan_category(category, Some(&cb), &allowlist_clone);
+                let res = scanner.scan(Some(&cb), &allowlist_clone);
 
                 let _ = tx_clone.send(ScanUpdate::Result(res));
             });

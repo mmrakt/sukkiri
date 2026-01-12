@@ -1,26 +1,42 @@
 use crate::allowlist::Allowlist;
-use crate::model::ScannedItem;
+use crate::model::{CategoryType, ScanResult, ScannedItem};
+use crate::scanner::Scanner;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::SystemTime;
 
-/// Scans for unused (dangling) Docker images using CLI
-pub fn scan_docker_unused_images(
-    progress_cb: Option<&(dyn Fn() + Sync)>,
-    allowlist: &Allowlist,
-) -> (Vec<ScannedItem>, &'static str, PathBuf) {
-    // Docker scanning via CLI
-    // Allowlist doesn't apply to Docker images easily as they are virtual paths for now.
-    // But we can check if allowlist rule matches "docker://..."
-    let items = scan_docker_unused_images_impl(progress_cb);
+pub struct DockerScanner;
 
-    let items: Vec<ScannedItem> = items
-        .into_iter()
-        .filter(|i| !allowlist.is_allowed(&i.path))
-        .collect();
+impl Scanner for DockerScanner {
+    fn category(&self) -> CategoryType {
+        CategoryType::DockerImages
+    }
 
-    let path = PathBuf::from("Docker"); // Virtual path
-    (items, "Unused Docker images (dangling=true)", path)
+    fn description(&self) -> String {
+        "Unused Docker images (dangling=true)".to_string()
+    }
+
+    fn scan(&self, progress_cb: Option<&(dyn Fn() + Sync)>, allowlist: &Allowlist) -> ScanResult {
+        // Docker scanning via CLI
+        let items = scan_docker_unused_images_impl(progress_cb);
+
+        let items: Vec<ScannedItem> = items
+            .into_iter()
+            .filter(|i| !allowlist.is_allowed(&i.path))
+            .collect();
+
+        let total_size = items.iter().map(|i| i.size).sum();
+        let path = PathBuf::from("Docker"); // Virtual path
+
+        ScanResult {
+            category: self.category(),
+            total_size,
+            items,
+            is_selected: false,
+            description: self.description(),
+            root_path: path,
+        }
+    }
 }
 
 fn scan_docker_unused_images_impl(progress_cb: Option<&(dyn Fn() + Sync)>) -> Vec<ScannedItem> {

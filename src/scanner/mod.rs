@@ -7,66 +7,96 @@ pub mod utils;
 pub mod xcode;
 
 use crate::allowlist::Allowlist;
-use crate::constants::{DESKTOP_DIR, DOWNLOADS_DIR};
 use crate::model::{CategoryType, ScanResult};
 use crate::scanner::utils::scan_path;
 use std::path::PathBuf;
 
-pub fn scan_category(
-    category: CategoryType,
-    progress_cb: Option<&(dyn Fn() + Sync)>,
-    allowlist: &Allowlist,
-) -> ScanResult {
-    let home = if let Ok(sudo_user) = std::env::var("SUDO_USER") {
-        PathBuf::from("/Users").join(sudo_user)
-    } else {
-        dirs::home_dir().expect("Home directory not found")
-    };
+pub trait Scanner: Send + Sync {
+    fn category(&self) -> CategoryType;
+    fn description(&self) -> String;
+    fn scan(&self, progress_cb: Option<&(dyn Fn() + Sync)>, allowlist: &Allowlist) -> ScanResult;
+}
 
-    let (items, description, root_path) = match category {
-        CategoryType::XcodeJunk => xcode::scan_xcode_junk(&home, progress_cb, allowlist),
-        CategoryType::SystemLogs => user::scan_system_logs(progress_cb, allowlist),
-        CategoryType::SystemCache => {
-            use crate::constants::SYSTEM_LIBRARY_CACHES;
-            let path = PathBuf::from(SYSTEM_LIBRARY_CACHES);
-            let (_, items) = scan_path(&path, progress_cb, allowlist);
-            (items, "System cache files.", path)
-        }
-        CategoryType::UserLogs => user::scan_user_logs(&home, progress_cb, allowlist),
-        CategoryType::BrowserCache => browsers::scan_browser_cache(&home, progress_cb, allowlist),
-        CategoryType::UserCache => user::scan_user_cache(&home, progress_cb, allowlist),
-        CategoryType::Downloads => {
-            let path = home.join(DOWNLOADS_DIR);
-            let (_, items) = scan_path(&path, progress_cb, allowlist);
-            (items, "All files in Downloads folder.", path)
-        }
-        CategoryType::Trash => trash::scan_trash(&home, progress_cb, allowlist),
-        CategoryType::DeveloperCaches => dev::scan_developer_caches(&home, progress_cb, allowlist),
-        CategoryType::ScreenCapture => {
-            let path = home.join(DESKTOP_DIR);
-            let mut items = Vec::new();
-            if path.exists() {
-                let (_, dt_items) = scan_path(&path, progress_cb, allowlist);
-                // Look for "Screenshot" or "スクリーンショット" prefix
-                items.extend(dt_items.into_iter().filter(|i| {
-                    let name = i.path.file_name().unwrap_or_default().to_string_lossy();
-                    name.starts_with("Screenshot") || name.starts_with("スクリーンショット")
-                }));
-            }
-            (items, "Screenshots on Desktop.", path)
-        }
-        CategoryType::NodeModules => dev::scan_node_modules(&home, progress_cb, allowlist),
-        CategoryType::DockerImages => docker::scan_docker_unused_images(progress_cb, allowlist),
-    };
+pub struct PathScanner {
+    pub category: CategoryType,
+    pub description: String,
+    pub paths: Vec<PathBuf>,
+}
 
-    let total_size: u64 = items.iter().map(|i| i.size).sum();
-
-    ScanResult {
-        category,
-        total_size,
-        items,
-        is_selected: false,
-        description: description.to_string(),
-        root_path,
+impl Scanner for PathScanner {
+    fn category(&self) -> CategoryType {
+        self.category
     }
+
+    fn description(&self) -> String {
+        self.description.clone()
+    }
+
+    fn scan(&self, progress_cb: Option<&(dyn Fn() + Sync)>, allowlist: &Allowlist) -> ScanResult {
+        let mut all_items = Vec::new();
+
+        for path in &self.paths {
+            let (_, mut items) = scan_path(path, progress_cb, allowlist);
+            all_items.append(&mut items);
+        }
+
+        let total_size: u64 = all_items.iter().map(|i| i.size).sum();
+
+        // Determine a "root" path for display.
+        // If there is only one path, use it. If multiple, maybe just the parent dir of the first or common path?
+        // OR just the first path.
+        let root_path = if self.paths.is_empty() {
+            dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"))
+        } else {
+            self.paths[0].clone()
+        };
+
+        ScanResult {
+            category: self.category,
+            total_size,
+            items: all_items,
+            is_selected: false,
+            description: self.description.clone(),
+            root_path,
+        }
+    }
+}
+
+pub fn get_all_scanners() -> Vec<Box<dyn Scanner>> {
+    let home = dirs::home_dir().expect("Home directory not found");
+
+    vec![
+        // Xcode: DerivedData, Archives, DeviceSupport
+        Box::new(xcode::xcode_scanner(&home)),
+        // System Logs: /Library/Logs, /private/var/log
+        Box::new(user::system_logs_scanner()),
+        // System Cache: /Library/Caches
+        Box::new(PathScanner {
+            category: CategoryType::SystemCache,
+            description: "System cache files.".to_string(),
+            paths: vec![PathBuf::from(crate::constants::SYSTEM_LIBRARY_CACHES)],
+        }),
+        // User Logs: ~/Library/Logs
+        Box::new(user::user_logs_scanner(&home)),
+        // User Cache: ~/Library/Caches (filtered) + Containers
+        Box::new(user::UserCacheScanner { home: home.clone() }),
+        // Browser Cache: Chrome, Safari, Firefox
+        Box::new(browsers::browser_cache_scanner(&home)),
+        // Downloads: ~/Downloads
+        Box::new(PathScanner {
+            category: CategoryType::Downloads,
+            description: "All files in Downloads folder.".to_string(),
+            paths: vec![home.join(crate::constants::DOWNLOADS_DIR)],
+        }),
+        // Trash: ~/.Trash
+        Box::new(trash::trash_scanner(&home)),
+        // Developer Caches: .npm, .cargo, etc.
+        Box::new(dev::developer_caches_scanner(&home)),
+        // Screen Capture: Desktop screenshots
+        Box::new(user::ScreenCaptureScanner { home: home.clone() }),
+        // Node Modules: Recursive search in ~/Projects
+        Box::new(dev::NodeModulesScanner { home: home.clone() }),
+        // Docker: dangling images
+        Box::new(docker::DockerScanner),
+    ]
 }
