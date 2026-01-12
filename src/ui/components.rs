@@ -48,7 +48,7 @@ pub fn render_header(f: &mut Frame, app: &App, area: Rect) {
     let gauge = Gauge::default()
         .block(
             Block::default()
-                .title("RustMacSweep v0.1.0")
+                .title("sukkiri v0.1.0")
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(COLOR_BORDER)),

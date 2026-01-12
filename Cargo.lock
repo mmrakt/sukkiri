@@ -896,24 +896,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-mac-sweep"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "crossterm 0.29.0",
- "dirs",
- "humansize",
- "indicatif",
- "jwalk",
- "ratatui",
- "rayon",
- "sysinfo",
- "tempfile",
- "trash",
-]
-
-[[package]]
 name = "rustc_version"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1047,6 +1029,24 @@ dependencies = [
  "quote",
  "rustversion",
  "syn",
+]
+
+[[package]]
+name = "sukkiri"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "crossterm 0.29.0",
+ "dirs",
+ "humansize",
+ "indicatif",
+ "jwalk",
+ "ratatui",
+ "rayon",
+ "sysinfo",
+ "tempfile",
+ "trash",
 ]
 
 [[package]]

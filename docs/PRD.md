@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD)
 
-**Project Name (仮):** RustMacSweep
+**Project Name (仮):** sukkiri
 **Version:** 0.1 (Draft)
 **Date:** 2026-01-10
 **Language:** Rust
@@ -109,7 +109,7 @@ struct ScannedItem {
 ### メインダッシュボード画面イメージ
 
 ```text
-  RustMacSweep v0.1.0  |  Disk: 450GB / 1TB (45% Used)
+  sukkiri v0.1.0  |  Disk: 450GB / 1TB (45% Used)
  ──────────────────────────────────────────────────────────────────────────
   [Categories]                 |  [Details: Xcode DerivedData]
                                |

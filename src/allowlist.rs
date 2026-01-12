@@ -17,7 +17,7 @@ impl Allowlist {
         let mut rules = Vec::new();
 
         if let Some(config_dir) = dirs::config_dir() {
-            let allowlist_path = config_dir.join("rust-mac-sweep/allowlist.txt");
+            let allowlist_path = config_dir.join("sukkiri/allowlist.txt");
             if allowlist_path.exists()
                 && let Ok(file) = fs::File::open(allowlist_path)
             {

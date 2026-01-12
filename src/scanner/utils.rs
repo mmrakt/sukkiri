@@ -152,8 +152,7 @@ mod tests {
 
     #[test]
     fn scan_non_existent_path() {
-        let path =
-            PathBuf::from("/path/to/non/existent/directory/rust_mac_sweep_test_random_12345");
+        let path = PathBuf::from("/path/to/non/existent/directory/sukkiri_test_random_12345");
         let allowlist = Allowlist::new(vec![]);
         let (total_size, items) = scan_path(&path, None, &allowlist);
         assert_eq!(total_size, 0);
