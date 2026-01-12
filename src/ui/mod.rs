@@ -67,6 +67,7 @@ pub fn run_app(
                     KeyCode::Down | KeyCode::Char('j') => app.next(),
                     KeyCode::Up | KeyCode::Char('k') => app.previous(),
                     KeyCode::Char(' ') => app.toggle(),
+                    KeyCode::Char('a' | 'A') => app.toggle_all(),
                     KeyCode::Enter => {
                         if app.total_selected_size() > 0 {
                             app.state = AppState::Confirming;

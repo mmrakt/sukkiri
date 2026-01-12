@@ -97,6 +97,16 @@ impl App {
         }
     }
 
+    pub fn toggle_all(&mut self) {
+        if self.results.is_empty() {
+            return;
+        }
+        let all_selected = self.results.iter().all(|r| r.is_selected);
+        for result in &mut self.results {
+            result.is_selected = !all_selected;
+        }
+    }
+
     pub fn total_selected_size(&self) -> u64 {
         self.results
             .iter()
@@ -331,5 +341,48 @@ mod tests {
         assert_eq!(app.results.len(), 1);
         assert!(matches!(app.state, AppState::Browsing));
         assert!(app.scan_rx.is_none());
+    }
+
+    #[test]
+    fn test_toggle_all() {
+        let mut app = App {
+            results: vec![
+                ScanResult {
+                    category: CategoryType::XcodeJunk,
+                    total_size: 100,
+                    items: vec![],
+                    is_selected: false,
+                    description: String::new(),
+                    root_path: PathBuf::new(),
+                },
+                ScanResult {
+                    category: CategoryType::SystemLogs,
+                    total_size: 200,
+                    items: vec![],
+                    is_selected: true,
+                    description: String::new(),
+                    root_path: PathBuf::new(),
+                },
+            ],
+            list_state: ListState::default(),
+            state: AppState::Browsing,
+            disks: Disks::new(),
+            cleaning_rx: None,
+            scan_rx: None,
+            scan_progress: HashMap::new(),
+            total_categories: 2,
+        };
+
+        // 1. Initially mixed (some true, some false). toggle_all should select all.
+        app.toggle_all();
+        assert!(app.results.iter().all(|r| r.is_selected));
+
+        // 2. All selected. toggle_all should deselect all.
+        app.toggle_all();
+        assert!(app.results.iter().all(|r| !r.is_selected));
+
+        // 3. None selected. toggle_all should select all.
+        app.toggle_all();
+        assert!(app.results.iter().all(|r| r.is_selected));
     }
 }

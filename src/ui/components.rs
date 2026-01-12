@@ -194,7 +194,7 @@ pub fn render_footer(f: &mut Frame, app: &App, area: Rect) {
     let total_selected = app.total_selected_size();
     let footer_text = match app.state {
         AppState::Browsing => format!(
-            "Total Selected: {} | [Space] Toggle [Enter] Clean [q] Quit",
+            "Total Selected: {} | [Space] Toggle [a] All [Enter] Clean [q] Quit",
             format_size(total_selected, BINARY)
         ),
         AppState::Confirming => format!(
