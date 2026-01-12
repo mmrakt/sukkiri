@@ -2,6 +2,19 @@
 name = "sukkiri"
 version = "0.1.0"
 edition = "2024"
+authors = ["mmrakt"]
+description = "A lightweight TUI disk cleanup tool for macOS"
+license = "MIT"
+repository = "https://github.com/mmrakt/sukkiri"
+readme = "README.md"
+keywords = ["macos", "cleanup", "tui", "cli", "utility"]
+categories = ["command-line-utilities", "os::macos-apis"]
+include = [
+    "src/**/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE"
+]
 
 [dependencies]
 anyhow = "1.0.100"
