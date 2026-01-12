@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CategoryType {
     XcodeJunk,
     SystemLogs,
@@ -19,7 +19,7 @@ pub enum CategoryType {
 }
 
 impl CategoryType {
-    pub fn name(&self) -> &str {
+    pub fn name(self) -> &'static str {
         match self {
             Self::XcodeJunk => "Xcode Junk",
             Self::SystemLogs => "System Log Files",
@@ -46,6 +46,7 @@ pub struct ScannedItem {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ScanResult {
     pub category: CategoryType,
     pub total_size: u64,
@@ -53,4 +54,11 @@ pub struct ScanResult {
     pub is_selected: bool,
     pub description: String,
     pub root_path: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+pub struct ScanProgress {
+    pub category: CategoryType,
+    pub items_count: u64,
+    pub status: String, // e.g., "Scanning..." or "Done"
 }
