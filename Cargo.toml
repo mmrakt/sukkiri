@@ -27,7 +27,6 @@ jwalk = "0.8.1"
 ratatui = "0.29.0"
 rayon = "1.11.0"
 sysinfo = "0.37.2"
-trash = "5.2.5"
 
 [dev-dependencies]
 tempfile = "3.24.0"

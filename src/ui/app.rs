@@ -142,7 +142,7 @@ impl App {
             // thread::sleep(Duration::from_millis(500));
 
             let size = items.iter().map(|i| i.size).sum::<u64>();
-            match cleaner::move_to_trash(&items) {
+            match cleaner::delete_items(&items) {
                 Ok(()) => {
                     let msg = format!("Successfully cleaned {}!", format_size(size, BINARY));
                     let _ = tx.send(Ok(msg));

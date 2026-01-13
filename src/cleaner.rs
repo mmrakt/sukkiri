@@ -3,7 +3,7 @@ use anyhow::Result;
 
 use std::process::Command;
 
-pub fn move_to_trash(items: &[ScannedItem]) -> Result<()> {
+pub fn delete_items(items: &[ScannedItem]) -> Result<()> {
     if items.is_empty() {
         return Ok(());
     }
@@ -43,9 +43,15 @@ pub fn move_to_trash(items: &[ScannedItem]) -> Result<()> {
         }
     }
 
-    // 2. Move files to trash
+    // 2. Permanently delete files
     if !file_paths.is_empty() {
-        trash::delete_all(&file_paths)?;
+        for path in file_paths {
+            if path.is_dir() {
+                let _ = std::fs::remove_dir_all(path);
+            } else {
+                let _ = std::fs::remove_file(path);
+            }
+        }
     }
 
     Ok(())
@@ -60,7 +66,7 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn move_to_trash_logic() -> Result<()> {
+    fn permanent_delete_logic() -> Result<()> {
         let dir = tempdir()?;
         let file_path = dir.path().join("test_file.txt");
         File::create(&file_path)?;
@@ -73,7 +79,7 @@ mod tests {
             modified: SystemTime::now(),
         };
 
-        move_to_trash(&[item])?;
+        delete_items(&[item])?;
 
         assert!(!file_path.exists());
         Ok(())
@@ -82,7 +88,7 @@ mod tests {
     #[test]
     fn move_to_trash_empty_list() -> Result<()> {
         let items: Vec<ScannedItem> = vec![];
-        move_to_trash(&items)?;
+        delete_items(&items)?;
         Ok(())
     }
 }
