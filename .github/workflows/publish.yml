@@ -4,9 +4,9 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - 'README.md'
-      - '.gitignore'
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
 
 jobs:
   publish:
@@ -51,6 +51,6 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          git add Cargo.toml
+          git add Cargo.toml Cargo.lock
           git commit -m "chore: bump version to ${{ env.NEW_VERSION }} [skip ci]"
           git push origin main
