@@ -25,6 +25,10 @@ Simply run:
 sukkiri
 ```
 
+### Options
+- `-h`, `--help`: Show help information
+- `-v`, `--version`: Show version information
+
 ### Keybindings
 - `j` / `Down`: Move down
 - `k` / `Up`: Move up
